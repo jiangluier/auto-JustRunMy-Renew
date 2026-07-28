@@ -545,7 +545,7 @@ def renew(sb) -> bool:
         time.sleep(4)
         timer_text = sb.get_text('span.font-mono.text-xl')
         print(f"⏱️ 当前应用剩余时间: {timer_text}")
-        if "2 days 23" in timer_text or "3 days" in timer_text:
+        if "1 days 11" in timer_text or "2 days" in timer_text:
             print("✅ 完美！续期任务圆满完成！")
             sb.save_screenshot("renew_success.png")
             send_tg_message("✅", "续期完成", timer_text)
