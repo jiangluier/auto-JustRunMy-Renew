@@ -212,16 +212,10 @@ def send_tg_message(status_icon, status_text, time_left):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         print("ℹ️ 未配置 TG_BOT_TOKEN 或 TG_CHAT_ID，跳过 Telegram 推送。")
         return
-
-    # 获取北京时间 (UTC+8)
     local_time = time.gmtime(time.time() + 8 * 3600)
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
-
-    # 脱敏邮箱，构造账号超链接
     masked = mask_email(EMAIL)
     account_line = f"<a href='tg://user?id={TG_CHAT_ID}'>{masked}</a>"
-
-    # 按照格式拼接消息，动态注入抓取到的应用名称
     text = (
         f"🎮 justrunmy.app 续期报告\n🖥 {DYNAMIC_APP_NAME}\n"
         f"👤 账号: {account_line}\n"
@@ -230,14 +224,8 @@ def send_tg_message(status_icon, status_text, time_left):
         f"{status_icon} {status_text}\n"
         f"⏱️ 剩余: {time_left}"
     )
-
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TG_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML"
-    }
-    
+    payload = {"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}
     try:
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
@@ -315,17 +303,12 @@ _COORDS_JS = """
 
 _WININFO_JS = """
 (function(){
-    return {
-        sx: window.screenX || 0,
-        sy: window.screenY || 0,
-        oh: window.outerHeight,
-        ih: window.innerHeight
-    };
+    return {sx: window.screenX || 0, sy: window.screenY || 0, oh: window.outerHeight, ih: window.innerHeight};
 })()
 """
 
 # ============================================================
-#  底层输入工具
+#  底层输入工具与多重行为模拟引擎
 # ============================================================
 def js_fill_input(sb, selector: str, text: str):
     safe_text = text.replace('\\', '\\\\').replace('"', '\\"')
@@ -334,15 +317,13 @@ def js_fill_input(sb, selector: str, text: str):
         var el = document.querySelector('{selector}');
         if (!el) return;
         var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        if (nativeInputValueSetter) {{
-            nativeInputValueSetter.call(el, "{safe_text}");
-        }} else {{
-            el.value = "{safe_text}";
-        }}
+        if (nativeInputValueSetter) {{ nativeInputValueSetter.call(el, "{safe_text}"); }}
+        else {{ el.value = "{safe_text}"; }}
         el.dispatchEvent(new Event('input', {{ bubbles: true }}));
         el.dispatchEvent(new Event('change', {{ bubbles: true }}));
     }})()
     """)
+
 
 def _activate_window():
     for cls in ["chrome", "chromium", "Chromium", "Chrome", "google-chrome"]:
@@ -360,19 +341,50 @@ def _activate_window():
     except Exception:
         pass
 
-def _xdotool_click(x: int, y: int):
+
+def _xdotool_click(x: int, y: int, penetration_mode: bool = False):
     _activate_window()
-    try:
-        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y)], timeout=3, stderr=subprocess.DEVNULL)
-        time.sleep(0.15)
-        subprocess.run(["xdotool", "click", "1"], timeout=2, stderr=subprocess.DEVNULL)
-    except Exception:
-        os.system(f"xdotool mousemove {x} {y} click 1 2>/dev/null")
+    import random
+    if penetration_mode:
+        print("  ⚡ [底层击穿模式激活] 正在为您模拟人类鼠标变速平滑轨迹滑动...")
+        try:
+            res = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True, timeout=2)
+            lines = res.stdout.strip().split("\n")
+            curr_x = int(lines[0].split("=")[1])
+            curr_y = int(lines[1].split("=")[1])
+        except Exception:
+            curr_x, curr_y = 0, 0
+        target_x = x + random.randint(-4, 4)
+        target_y = y + random.randint(-4, 4)
+        steps = random.randint(15, 25)
+        for i in range(1, steps + 1):
+            t = i / steps
+            t = t * t * (3 - 2 * t)
+            next_x = int(curr_x + (target_x - curr_x) * t + random.randint(-1, 1))
+            next_y = int(curr_y + (target_y - curr_y) * t + random.randint(-1, 1))
+            subprocess.run(["xdotool", "mousemove", str(next_x), str(next_y)], stderr=subprocess.DEVNULL)
+            time.sleep(random.uniform(0.01, 0.02))
+        subprocess.run(["xdotool", "mousemove", str(target_x), str(target_y)], stderr=subprocess.DEVNULL)
+        time.sleep(random.uniform(0.12, 0.25))
+        subprocess.run(["xdotool", "mousedown", "1"], stderr=subprocess.DEVNULL)
+        time.sleep(random.uniform(0.07, 0.16))
+        subprocess.run(["xdotool", "mouseup", "1"], stderr=subprocess.DEVNULL)
+        print(f"  🎯 击穿点击执行完毕，随机模拟坐标落点: ({target_x}, {target_y})")
+    else:
+        rx = x + random.randint(-2, 2)
+        ry = y + random.randint(-2, 2)
+        print(f"  🖱️ 物理级常规点击 Turnstile 坐标: ({rx}, {ry})")
+        try:
+            subprocess.run(["xdotool", "mousemove", "--sync", str(rx), str(ry)], timeout=3, stderr=subprocess.DEVNULL)
+            time.sleep(random.uniform(0.1, 0.2))
+            subprocess.run(["xdotool", "click", "1"], timeout=2, stderr=subprocess.DEVNULL)
+        except Exception:
+            os.system(f"xdotool mousemove {rx} {ry} click 1 2>/dev/null")
 
 # ============================================================
 #  人机验证处理
 # ============================================================
-def _click_turnstile(sb):
+def _click_turnstile(sb, penetration_mode: bool = False):
     try:
         coords = sb.execute_script(_COORDS_JS)
     except Exception as e:
@@ -385,26 +397,23 @@ def _click_turnstile(sb):
         wi = sb.execute_script(_WININFO_JS)
     except Exception:
         wi = {"sx": 0, "sy": 0, "oh": 800, "ih": 768}
-        
     bar = wi["oh"] - wi["ih"]
-    ax  = coords["cx"] + wi["sx"]
-    ay  = coords["cy"] + wi["sy"] + bar
-    print(f"  🖱️ 物理级点击 Turnstile ({ax}, {ay})")
-    _xdotool_click(ax, ay)
+    ax = coords["cx"] + wi["sx"]
+    ay = coords["cy"] + wi["sy"] + bar
+    _xdotool_click(ax, ay, penetration_mode=penetration_mode)
+
 
 def handle_turnstile(sb) -> bool:
     print("🔍 处理 Cloudflare Turnstile 验证...")
+    import random
     time.sleep(2)
-    
     if sb.execute_script(_SOLVED_JS):
         print("  ✅ 已静默通过")
         return True
-
     for _ in range(3):
         try: sb.execute_script(_EXPAND_JS)
         except Exception: pass
         time.sleep(0.5)
-
     for attempt in range(6):
         if sb.execute_script(_SOLVED_JS):
             print(f"  ✅ Turnstile 通过（第 {attempt + 1} 次尝试）")
@@ -412,16 +421,14 @@ def handle_turnstile(sb) -> bool:
         try: sb.execute_script(_EXPAND_JS)
         except Exception: pass
         time.sleep(0.3)
-        
-        _click_turnstile(sb)
-        
+        penetration_mode = (attempt >= 2)
+        _click_turnstile(sb, penetration_mode=penetration_mode)
         for _ in range(8):
-            time.sleep(0.5)
+            time.sleep(random.uniform(0.4, 0.6))
             if sb.execute_script(_SOLVED_JS):
                 print(f"  ✅ Turnstile 通过（第 {attempt + 1} 次尝试）")
                 return True
         print(f"  ⚠️ 第 {attempt + 1} 次未通过，重试...")
-
     print("  ❌ Turnstile 6 次均失败")
     return False
 
@@ -432,14 +439,12 @@ def login(sb) -> bool:
     print(f"🌐 打开登录页面: {LOGIN_URL}")
     sb.uc_open_with_reconnect(LOGIN_URL, reconnect_time=5)
     time.sleep(4)
-
     try:
         sb.wait_for_element('input[name="Email"]', timeout=15)
     except Exception:
         print("❌ 页面未加载出登录表单")
         sb.save_screenshot("login_load_fail.png")
         return False
-
     print("🍪 关闭可能的 Cookie 弹窗...")
     try:
         for btn in sb.find_elements("button"):
@@ -449,15 +454,12 @@ def login(sb) -> bool:
                 break
     except Exception:
         pass
-
-    print(f"📧 填写邮箱...")
+    print("📧 填写邮箱...")
     js_fill_input(sb, 'input[name="Email"]', EMAIL)
     time.sleep(0.3)
-    
     print("🔑 填写密码...")
     js_fill_input(sb, 'input[name="Password"]', PASSWORD)
     time.sleep(1)
-
     if sb.execute_script(_EXISTS_JS):
         if not handle_turnstile(sb):
             print("❌ 登录界面的 Turnstile 验证失败")
@@ -465,21 +467,27 @@ def login(sb) -> bool:
             return False
     else:
         print("ℹ️ 未检测到 Turnstile")
+    print("🖱️ 提交登录表单...")
+    try:
+        sb.click('button[type="submit"]')
+    except Exception:
+        sb.press_keys('input[name="Password"]', '\n')
 
-    print("🖱️ 敲击回车提交表单...")
-    sb.press_keys('input[name="Password"]', '\n')
+    print("⏳ 等待登录完成并验证会话...")
+    time.sleep(5)
 
-    print("⏳ 等待登录跳转...")
-    for _ in range(12):
-        time.sleep(1)
-        if sb.get_current_url().split('?')[0].lower() != LOGIN_URL.lower():
-            break
+    # 不能仅凭 URL 变化判断登录成功。登录失败页面也可能改变查询参数或尾部斜杠。
+    # 直接访问控制面板并检查登录表单是否再次出现，以确认认证 Cookie 真正生效。
+    sb.open("https://justrunmy.app/panel")
+    time.sleep(5)
 
-    if sb.get_current_url().split('?')[0].lower() != LOGIN_URL.lower():
-        print("✅ 登录成功！")
+    current_url = sb.get_current_url()
+    login_form_visible = sb.is_element_present('input[name="Email"]')
+    if "/id/Account/Login" not in current_url and not login_form_visible:
+        print("✅ 登录成功，会话验证通过！")
         return True
-        
-    print("❌ 登录失败，页面没有跳转。")
+
+    print(f"❌ 登录失败或登录会话未生效，当前页面: {current_url}")
     sb.save_screenshot("login_failed.png")
     return False
 
@@ -488,32 +496,17 @@ def login(sb) -> bool:
 # ============================================================
 def renew(sb) -> bool:
     global DYNAMIC_APP_NAME
-    
+
     print("\n" + "="*50)
     print("   🚀 开始自动续期流程")
     print("="*50)
-    
-    print("🌐 进入控制面板: https://justrunmy.app/panel")
-    sb.open("https://justrunmy.app/panel")
-    time.sleep(3)
 
-    print("🖱️ 自动读取应用名称...")
-    try:
-        # 等待带有 font-semibold 的 h3 标签加载
-        sb.wait_for_element('h3.font-semibold', timeout=10)
-        # 从网页中抓取真实的名称并保存到全局变量
-        DYNAMIC_APP_NAME = sb.get_text('h3.font-semibold')
-        print(f"🎯 成功抓取到应用名称: {DYNAMIC_APP_NAME}")
-        
-        # 直接点击刚才抓取到的元素
-        sb.click('h3.font-semibold')
-        time.sleep(3)
-        print(f"📍 成功进入应用详情页: {sb.get_current_url()}")
-    except Exception as e:
-        print(f"❌ 找不到应用卡片: {e}")
-        sb.save_screenshot("renew_app_not_found.png")
-        send_tg_message("❌", "续期失败(找不到应用)", "未知")
-        return False
+    DYNAMIC_APP_NAME = "bot"
+    print("🌐 直接进入指定应用详情页: https://justrunmy.app/panel/application/39529/")
+    sb.open("https://justrunmy.app/panel/application/39529/")
+    time.sleep(5)
+    print(f"🎯 当前应用名称: {DYNAMIC_APP_NAME}")
+    print(f"📍 当前应用详情页: {sb.get_current_url()}")
 
     print("🖱️ 点击 Reset Timer 按钮...")
     try:
@@ -539,7 +532,7 @@ def renew(sb) -> bool:
     try:
         sb.click('button:contains("Just Reset")')
         print("⏳ 提交续期请求，等待服务器处理...")
-        time.sleep(5) 
+        time.sleep(5)
     except Exception as e:
         print(f"❌ 找不到 Just Reset 按钮: {e}")
         sb.save_screenshot("renew_just_reset_not_found.png")
@@ -550,10 +543,8 @@ def renew(sb) -> bool:
     try:
         sb.refresh()
         time.sleep(4)
-        # 根据页面结构获取剩余时间文本
         timer_text = sb.get_text('span.font-mono.text-xl')
         print(f"⏱️ 当前应用剩余时间: {timer_text}")
-        
         if "2 days 23" in timer_text or "3 days" in timer_text:
             print("✅ 完美！续期任务圆满完成！")
             sb.save_screenshot("renew_success.png")
@@ -563,7 +554,7 @@ def renew(sb) -> bool:
             print("⚠️ 倒计时似乎没有重置到最高值，请人工检查截图确认。")
             sb.save_screenshot("renew_warning.png")
             send_tg_message("⚠️", "续期异常(请检查)", timer_text)
-            return True 
+            return True
     except Exception as e:
         print(f"⚠️ 读取倒计时失败，但流程已执行完毕: {e}")
         sb.save_screenshot("renew_timer_read_fail.png")
@@ -575,38 +566,28 @@ def renew(sb) -> bool:
 # ============================================================
 def main():
     print("=" * 50)
-    print("   JustRunMy.app 自动登录与续期脚本")
+    print("   JustRunMy.app 自动登录与续期脚本 (SSH 动态直连升级版)")
     print("=" * 50)
-
-    # 启动 Hysteria2 代理（带重试），若未配置则直连
     proxy_manager, proxy_url = start_proxy_with_retry(max_retries=5)
-
-    # 检查落地 IP
     print(f"🔍 正在检查 IP 信息（使用代理: {bool(proxy_url)})...")
     ip_info = check_ip(proxy_url)
     print(f"🌐 IP 信息：{ip_info}")
-
-    # 写入全局变量，供 send_tg_message 使用
     global CURRENT_IP_INFO
     CURRENT_IP_INFO = ip_info
-
     sb_kwargs = {"uc": True, "test": True, "headless": False}
-
     if proxy_url:
-        print(f"🔗 挂载代理: {proxy_url}")
+        print(f"🔗 挂载隧道代理至浏览器后端: {proxy_url}")
         sb_kwargs["proxy"] = proxy_url
     else:
-        print("🌐 未使用代理，直连访问")
-
+        print("🌐 未配置安全隧道，正在使用默认 Actions 裸奔直连访问")
     try:
         with SB(**sb_kwargs) as sb:
-            print("✅ 浏览器已启动")
+            print("✅ 自动化安全浏览器已成功拉起")
             try:
                 sb.open("https://api.ipify.org/?format=json")
-                print(f"🌐 当前出口真实 IP: {sb.get_text('body')}")
+                print(f"🌐 浏览器端实测出口真实 IP: {sb.get_text('body')}")
             except Exception:
                 pass
-
             if login(sb):
                 renew(sb)
             else:
