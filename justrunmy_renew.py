@@ -508,9 +508,9 @@ def renew(sb) -> bool:
     print(f"🎯 当前应用名称: {DYNAMIC_APP_NAME}")
     print(f"📍 当前应用详情页: {sb.get_current_url()}")
 
-    print("🖱️ 点击 Reset Timer 按钮...")
+    print("🖱️ 点击 Reset timer 按钮...")
     try:
-        sb.click('button:contains("Reset Timer")')
+        sb.click('button:contains("Reset timer")')
         time.sleep(3)
     except Exception as e:
         print(f"❌ 找不到 Reset Timer 按钮: {e}")
